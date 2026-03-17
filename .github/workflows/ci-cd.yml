@@ -1,0 +1,66 @@
+name: ISI BURGER - CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "thioro_burger" ]
+  pull_request:
+    branches: [ "thioro_burger" ]
+
+jobs:
+  # ─── 1. Installation des dépendances Laravel ─────────────
+  install:
+    name: 📦 Installation des dépendances
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Pull du code depuis GitHub
+        uses: actions/checkout@v4
+
+      - name: 🐘 Configuration PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, pdo_pgsql, gd, zip, bcmath
+
+      - name: 📦 Installation des dépendances Laravel
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: ⚙️ Configuration de l'environnement
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+  # ─── 2. Build de l'image Docker ──────────────────────────
+  build-docker:
+    name: 🐳 Build Image Docker
+    runs-on: ubuntu-latest
+    needs: install
+
+    steps:
+      - name: 📥 Pull du code depuis GitHub
+        uses: actions/checkout@v4
+
+      - name: 🏗️ Création de l'image Docker
+        run: |
+          docker build -t isi-burger:latest .
+          echo "✅ Image Docker créée avec succès !"
+
+      - name: 🔍 Vérification de l'image
+        run: docker images isi-burger
+
+  # ─── 3. Webhook Jenkins ──────────────────────────────────
+  webhook-jenkins:
+    name: 🔔 Notification Jenkins
+    runs-on: ubuntu-latest
+    needs: build-docker
+
+    steps:
+      - name: 🚀 Déclenchement Webhook Jenkins
+        run: |
+          curl -s -X POST \
+            "${{ secrets.JENKINS_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            --data-raw '{
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}"
+            }' || echo "⚠️ Webhook Jenkins non configuré"

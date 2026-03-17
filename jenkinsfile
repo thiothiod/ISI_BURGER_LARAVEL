@@ -1,0 +1,91 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME   = 'isi-burger'
+        DOCKER_IMAGE = 'isi-burger'
+        GITHUB_REPO  = 'https://github.com/thiothiod/ISI_BURGER_LARAVEL.git'
+        BRANCH       = 'thio_thiod_burger'
+    }
+
+    triggers {
+        githubPush()
+    }
+
+    stages {
+
+        stage('📥 Pull du code depuis GitHub') {
+            steps {
+                echo "=== Récupération du code depuis ${BRANCH} ==="
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${BRANCH}"]],
+                    userRemoteConfigs: [[
+                        url: "${GITHUB_REPO}",
+                        credentialsId: 'github-credentials'
+                    ]]
+                ])
+                echo "✅ Code récupéré"
+            }
+        }
+
+        stage('📦 Installation des dépendances Laravel') {
+            steps {
+                echo "=== Installation Composer ==="
+                sh '''
+                    php --version
+                    composer --version
+                    composer install --no-dev --optimize-autoloader --no-interaction
+                    echo "✅ Dépendances installées"
+                '''
+            }
+        }
+
+        stage('⚙️ Configuration environnement') {
+            steps {
+                sh '''
+                    cp .env.example .env
+                    php artisan key:generate --force
+                    echo "✅ Environnement configuré"
+                '''
+            }
+        }
+
+        stage('🐳 Création de l\'image Docker') {
+            steps {
+                echo "=== Build de l'image Docker ==="
+                sh """
+                    docker build \
+                        --tag ${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                        --tag ${DOCKER_IMAGE}:latest \
+                        .
+                    echo "✅ Image Docker créée : ${DOCKER_IMAGE}:${BUILD_NUMBER}"
+                    docker images ${DOCKER_IMAGE}
+                """
+            }
+        }
+
+        stage('🚀 Déploiement') {
+            steps {
+                sh """
+                    docker stop isi-burger-app || true
+                    docker rm isi-burger-app || true
+                    docker run -d \
+                        --name isi-burger-app \
+                        -p 8080:80 \
+                        ${DOCKER_IMAGE}:latest
+                    echo "✅ Application déployée sur le port 8080"
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 Pipeline ISI BURGER terminé avec succès !"
+        }
+        failure {
+            echo "❌ Pipeline ISI BURGER a échoué !"
+        }
+    }
+}
