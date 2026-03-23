@@ -29,8 +29,9 @@ class DashboardController extends Controller
             ->where('status', Order::STATUS_PAYEE)
             ->sum('paid_amount');
 
-        // Total produits
+        // Total produits notariés (non archivés) sert à afficher le nombre total de produits disponibles à la vente,
         $totalProducts = Product::notArchived()->count();
+
 
         // Commandes par mois (12 derniers mois) pour Chart.js
         $ordersParMois = Order::select(

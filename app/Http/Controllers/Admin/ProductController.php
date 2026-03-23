@@ -54,6 +54,7 @@ class ProductController extends Controller
         $validated['slug'] = Str::slug($request->name);
 
         if ($request->hasFile('image')) {
+            //has file vérifie si un fichier a été téléchargé pour le champ "image". Si c'est le cas, on stocke le fichier dans le dossier "products" du disque "public" et on enregistre le chemin dans la base de données.
             $validated['image'] = $request->file('image')->store('products', 'public');
         }
 
@@ -86,6 +87,10 @@ class ProductController extends Controller
         ]);
 
         $validated['slug'] = Str::slug($request->name);
+        //slug est une version "nettoyée" du nom du produit, 
+        //sans espaces ni caractères spéciaux, pour être utilisée dans les URLs. 
+        //Str::slug() est une fonction de Laravel qui génère automatiquement 
+        //ce slug à partir du nom du produit.
 
         if ($request->hasFile('image')) {
             if ($product->image) {

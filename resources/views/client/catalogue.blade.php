@@ -15,24 +15,131 @@
         .product-card:hover { transform: translateY(-4px); }
         .product-img { height: 200px; object-fit: cover; }
         .btn-danger { background: #e63946; border-color: #e63946; }
+        .cart-sidebar {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 380px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 20px rgba(0,0,0,.15);
+            z-index: 9999;
+            transition: right .3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .cart-sidebar.open { right: 0; }
+        .cart-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,.5);
+            z-index: 9998;
+        }
+        .cart-overlay.open { display: block; }
+        .cart-header {
+            background: #1d1d1d;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .cart-body { flex: 1; overflow-y: auto; padding: 15px; }
+        .cart-footer { padding: 15px; border-top: 2px solid #f0f0f0; background: #f8f9fa; }
+        .cart-item { background: #f8f9fa; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+        .qty-btn { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #e63946; background: white; color: #e63946; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .qty-btn:hover { background: #e63946; color: white; }
+        .cart-badge {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            background: #e63946;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(230,57,70,.4);
+            cursor: pointer;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-dark mb-4">
         <div class="container-fluid">
-            <span class="navbar-brand">🍔 ISI BURGER</span>
+            <a class="navbar-brand" href="{{ route('home') }}">🍔 ISI BURGER</a>
             <div class="d-flex align-items-center gap-3">
-                <span class="text-white">{{ auth()->user()->name }}</span>
-                <a href="{{ route('client.orders.index') }}" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-shopping-bag me-1"></i>Mes Commandes
-                </a>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button class="btn btn-outline-danger btn-sm">Déconnexion</button>
-                </form>
+                @auth
+                    <span class="text-white">{{ auth()->user()->name }}</span>
+                    <a href="{{ route('client.orders.index') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-shopping-bag me-1"></i>Mes Commandes
+                    </a>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button class="btn btn-outline-danger btn-sm">Déconnexion</button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}" class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-sign-in-alt me-1"></i>Connexion
+                    </a>
+                    <a href="{{ route('register') }}" class="btn btn-danger btn-sm">
+                        <i class="fas fa-user-plus me-1"></i>S'inscrire
+                    </a>
+                @endauth
             </div>
         </div>
     </nav>
+
+    {{-- Overlay --}}
+    <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+
+    {{-- Panier Sidebar --}}
+    <div class="cart-sidebar" id="cartSidebar">
+        <div class="cart-header">
+            <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Mon Panier</h5>
+            <button onclick="closeCart()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="cart-body" id="cartBody">
+            <div id="cartEmpty" class="text-center py-5 text-muted">
+                <i class="fas fa-shopping-cart fa-3x mb-3"></i>
+                <p>Votre panier est vide</p>
+            </div>
+            <div id="cartItems"></div>
+        </div>
+        <div class="cart-footer">
+            <div class="d-flex justify-content-between fw-bold fs-5 mb-3">
+                <span>Total</span>
+                <span class="text-danger" id="cartTotal">0 F</span>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Notes (optionnel)</label>
+                <textarea class="form-control" id="notesInput" rows="2"
+                          placeholder="Instructions spéciales..."></textarea>
+            </div>
+            <button onclick="confirmOrder()" class="btn btn-danger w-100 py-2 fw-bold">
+                <i class="fas fa-check me-2"></i>Confirmer la commande
+            </button>
+        </div>
+    </div>
+
+    {{-- Bouton panier flottant --}}
+    <button class="cart-badge" id="cartBadge" onclick="openCart()">
+        <i class="fas fa-shopping-cart me-2"></i>
+        <span id="cartCount">0</span> article(s) -
+        <span id="cartTotalBadge">0</span> F
+    </button>
+
+    <form id="orderForm" method="POST" action="{{ route('client.orders.store') }}">
+        @csrf
+        <div id="orderItemsContainer"></div>
+        <input type="hidden" name="notes" id="orderNotesHidden">
+    </form>
 
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -78,13 +185,11 @@
                     </div>
                     <div class="col-md-2">
                         <input type="number" name="min_price" class="form-control"
-                               placeholder="Prix min"
-                               value="{{ request('min_price') }}">
+                               placeholder="Prix min" value="{{ request('min_price') }}">
                     </div>
                     <div class="col-md-2">
                         <input type="number" name="max_price" class="form-control"
-                               placeholder="Prix max"
-                               value="{{ request('max_price') }}">
+                               placeholder="Prix max" value="{{ request('max_price') }}">
                     </div>
                     <div class="col-md-2">
                         <select name="sort" class="form-select">
@@ -102,26 +207,6 @@
                 </form>
             </div>
         </div>
-
-        {{-- Panier --}}
-        <div id="cartSummary" class="alert alert-danger d-none mb-4">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <i class="fas fa-shopping-cart me-2"></i>
-                    <strong id="cartCount">0</strong> article(s) -
-                    <strong id="cartTotal">0</strong> F
-                </div>
-                <button type="button" class="btn btn-white btn-sm border" onclick="submitOrder()">
-                    <i class="fas fa-check me-1"></i>Commander
-                </button>
-            </div>
-        </div>
-
-        <form id="orderForm" method="POST" action="{{ route('client.orders.store') }}">
-            @csrf
-            <div id="orderItemsContainer"></div>
-            <input type="hidden" name="notes" id="orderNotes">
-        </form>
 
         {{-- Produits --}}
         <div class="row g-4">
@@ -145,23 +230,11 @@
                         <span class="fs-5 fw-bold text-danger">
                             {{ number_format($product->price, 0, ',', ' ') }} F
                         </span>
-                        <div id="qty-{{ $product->id }}" class="mt-2 d-none">
-                            <small class="text-success fw-semibold">
-                                <i class="fas fa-shopping-cart me-1"></i>
-                                Quantité : <span id="qty-display-{{ $product->id }}">0</span>
-                            </small>
-                        </div>
                     </div>
-                    <div class="card-footer bg-white border-0 d-flex gap-2">
-                        <button type="button"
-                                class="btn btn-danger flex-fill"
+                    <div class="card-footer bg-white border-0">
+                        <button type="button" class="btn btn-danger w-100"
                                 onclick="addToCart({{ $product->id }}, '{{ addslashes($product->name) }}', {{ $product->price }})">
-                            <i class="fas fa-plus me-1"></i>Ajouter
-                        </button>
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                onclick="removeFromCart({{ $product->id }})">
-                            <i class="fas fa-minus"></i>
+                            <i class="fas fa-cart-plus me-2"></i>Ajouter au panier
                         </button>
                     </div>
                 </div>
@@ -174,39 +247,7 @@
             @endforelse
         </div>
 
-        <div class="mt-4">{{ $products->withQueryString()->links() }}</div>
-    </div>
-
-    {{-- Modal confirmation --}}
-    <div class="modal fade" id="orderModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold">🛒 Confirmer la commande</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="modalCartItems"></div>
-                    <hr>
-                    <div class="d-flex justify-content-between fw-bold fs-5">
-                        <span>Total</span>
-                        <span class="text-danger" id="modalTotal"></span>
-                    </div>
-                    <div class="mt-3">
-                        <label class="form-label">Notes (optionnel)</label>
-                        <textarea class="form-control" id="notesInput" rows="2"
-                                  placeholder="Instructions spéciales..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary"
-                            data-bs-dismiss="modal">Continuer</button>
-                    <button type="button" class="btn btn-danger px-4" onclick="confirmOrder()">
-                        <i class="fas fa-check me-2"></i>Confirmer
-                    </button>
-                </div>
-            </div>
-        </div>
+        <div class="mt-4 mb-5">{{ $products->withQueryString()->links() }}</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -219,75 +260,139 @@
             }
             cart[id].qty++;
             updateCartUI();
-            updateQtyDisplay(id);
+            openCart();
+        }
+
+        function increaseQty(id) {
+            if (cart[id]) {
+                cart[id].qty++;
+                updateCartUI();
+            }
+        }
+
+        function decreaseQty(id) {
+            if (cart[id] && cart[id].qty > 1) {
+                cart[id].qty--;
+                updateCartUI();
+            } else {
+                removeFromCart(id);
+            }
         }
 
         function removeFromCart(id) {
-            if (cart[id] && cart[id].qty > 0) {
-                cart[id].qty--;
-                if (cart[id].qty === 0) delete cart[id];
-            }
+            delete cart[id];
             updateCartUI();
-            updateQtyDisplay(id);
         }
-
-                function updateQtyDisplay(id) {
-    const qtyDiv     = document.getElementById('qty-' + id);
-    const qtyDisplay = document.getElementById('qty-display-' + id);
-    if (!qtyDiv || !qtyDisplay) return;
-    if (cart[id] && cart[id].qty > 0) {
-        qtyDiv.classList.remove('d-none');
-        qtyDisplay.textContent = cart[id].qty;
-    } else {
-        qtyDiv.classList.add('d-none');
-    }
-}
 
         function updateCartUI() {
-            const items = Object.entries(cart).filter(function([k, v]) { return v.qty > 0; });
-            const total = items.reduce(function(sum, [k, v]) { return sum + v.price * v.qty; }, 0);
-            const count = items.reduce(function(sum, [k, v]) { return sum + v.qty; }, 0);
-            const summary = document.getElementById('cartSummary');
+            const items = Object.entries(cart);
+            const total = items.reduce(function(sum, entry) {
+                return sum + entry[1].price * entry[1].qty;
+            }, 0);
+            const count = items.reduce(function(sum, entry) {
+                return sum + entry[1].qty;
+            }, 0);
+
+            // Badge flottant
+            const badge = document.getElementById('cartBadge');
             if (count > 0) {
-                summary.classList.remove('d-none');
+                badge.style.display = 'block';
                 document.getElementById('cartCount').textContent = count;
-                document.getElementById('cartTotal').textContent = total.toLocaleString('fr-FR');
+                document.getElementById('cartTotalBadge').textContent = total.toLocaleString('fr-FR');
             } else {
-                summary.classList.add('d-none');
+                badge.style.display = 'none';
             }
-        }
 
-        function submitOrder() {
-            const items = Object.entries(cart).filter(function([k, v]) { return v.qty > 0; });
-            if (items.length === 0) return;
-            let html  = '<ul class="list-group">';
-            let total = 0;
-            items.forEach(function([id, item]) {
-                const sub = item.price * item.qty;
-                total += sub;
-                html += '<li class="list-group-item d-flex justify-content-between">' +
-                    '<span>' + item.name + ' × ' + item.qty + '</span>' +
-                    '<strong>' + sub.toLocaleString('fr-FR') + ' F</strong>' +
-                    '</li>';
+            // Total sidebar
+            document.getElementById('cartTotal').textContent = total.toLocaleString('fr-FR') + ' F';
+
+            // Items sidebar
+            const cartItemsDiv = document.getElementById('cartItems');
+            const cartEmpty    = document.getElementById('cartEmpty');
+
+            if (items.length === 0) {
+                cartEmpty.style.display = 'block';
+                cartItemsDiv.innerHTML  = '';
+                return;
+            }
+
+            cartEmpty.style.display = 'none';
+            let html = '';
+            items.forEach(function(entry) {
+                const id   = entry[0];
+                const item = entry[1];
+                const sub  = item.price * item.qty;
+                html += '<div class="cart-item">' +
+                    '<div class="d-flex justify-content-between align-items-start mb-2">' +
+                        '<strong>' + item.name + '</strong>' +
+                        '<button onclick="removeFromCart(' + id + ')" style="background:none; border:none; color:#dc3545; cursor:pointer">' +
+                            '<i class="fas fa-trash"></i>' +
+                        '</button>' +
+                    '</div>' +
+                    '<div class="d-flex justify-content-between align-items-center">' +
+                        '<div class="d-flex align-items-center gap-2">' +
+                            '<button class="qty-btn" onclick="decreaseQty(' + id + ')">−</button>' +
+                            '<span class="fw-bold">' + item.qty + '</span>' +
+                            '<button class="qty-btn" onclick="increaseQty(' + id + ')">+</button>' +
+                        '</div>' +
+                        '<span class="fw-bold text-danger">' + sub.toLocaleString('fr-FR') + ' F</span>' +
+                    '</div>' +
+                '</div>';
             });
-            html += '</ul>';
-            document.getElementById('modalCartItems').innerHTML = html;
-            document.getElementById('modalTotal').textContent   = total.toLocaleString('fr-FR') + ' F';
-            new bootstrap.Modal(document.getElementById('orderModal')).show();
+            cartItemsDiv.innerHTML = html;
         }
 
-        function confirmOrder() {
-            const items     = Object.entries(cart).filter(function([k, v]) { return v.qty > 0; });
+        function openCart() {
+            document.getElementById('cartSidebar').classList.add('open');
+            document.getElementById('cartOverlay').classList.add('open');
+        }
+
+        function closeCart() {
+            document.getElementById('cartSidebar').classList.remove('open');
+            document.getElementById('cartOverlay').classList.remove('open');
+        }
+
+     function confirmOrder() {
+            @if(!auth()->check())
+                // Sauvegarder le panier dans localStorage
+                localStorage.setItem('isi_cart', JSON.stringify(cart));
+                window.location.href = "{{ route('login') }}";
+                return;
+            @endif
+
+            const items = Object.entries(cart);
+            if (items.length === 0) {
+                alert('Votre panier est vide !');
+                return;
+            }
+
             const container = document.getElementById('orderItemsContainer');
             container.innerHTML = '';
-            items.forEach(function([id, item], i) {
+            items.forEach(function(entry, i) {
+                const id  = entry[0];
+                const item = entry[1];
                 container.innerHTML +=
                     '<input type="hidden" name="items[' + i + '][id]" value="' + id + '">' +
                     '<input type="hidden" name="items[' + i + '][qty]" value="' + item.qty + '">';
             });
-            document.getElementById('orderNotes').value = document.getElementById('notesInput').value;
+
+            document.getElementById('orderNotesHidden').value = document.getElementById('notesInput').value;
             document.getElementById('orderForm').submit();
         }
+
+
+        // Restaurer le panier après connexion
+    window.addEventListener('load', function() {
+        const savedCart = localStorage.getItem('isi_cart');
+        if (savedCart) {
+            cart = JSON.parse(savedCart);
+            localStorage.removeItem('isi_cart');
+            updateCartUI();
+            @auth
+                openCart();
+            @endauth
+        }
+    });
     </script>
 </body>
 </html>

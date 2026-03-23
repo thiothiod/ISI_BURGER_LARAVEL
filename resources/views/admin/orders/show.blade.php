@@ -146,26 +146,40 @@
                             </span>
                         </div>
 
-                        @if(!in_array($order->status, ['annulee', 'payee']))
-                        <form method="POST"
-                              action="{{ route('admin.orders.update-status', $order) }}">
-                            @csrf @method('PATCH')
-                            <div class="mb-3">
-                                <select name="status" class="form-select">
-                                    @foreach($statusLabels as $key => $label)
-                                        @if($key !== 'annulee')
-                                        <option value="{{ $key }}"
-                                            {{ $order->status === $key ? 'selected' : '' }}>
-                                            {{ $label }}
-                                        </option>
-                                        @endif
-                                    @endforeach
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-save me-2"></i>Mettre à jour
-                            </button>
-                        </form>
+                       @if(!in_array($order->status, ['annulee', 'payee']))
+<form method="POST"
+      action="{{ route('admin.orders.update-status', $order) }}">
+    @csrf @method('PATCH')
+    <div class="mb-3">
+        <select name="status" class="form-select" id="statusSelect"
+                onchange="togglePaymentField(this.value)">
+            @foreach($statusLabels as $key => $label)
+                @if($key !== 'annulee')
+                <option value="{{ $key }}"
+                    {{ $order->status === $key ? 'selected' : '' }}>
+                    {{ $label }}
+                </option>
+                @endif
+            @endforeach
+        </select>
+    </div>
+
+    {{-- Champ montant visible seulement si statut = payee --}}
+    <div id="paymentField" class="mb-3 d-none">
+        <label class="form-label fw-semibold">Montant reçu (FCFA) *</label>
+        <input type="number" name="paid_amount" class="form-control"
+               placeholder="Saisir le montant..."
+               value="{{ $order->total_amount }}">
+        <div class="mt-2 p-2 bg-light rounded">
+            <small class="text-muted">Montant attendu : </small>
+            <strong class="text-danger">{{ number_format($order->total_amount, 0, ',', ' ') }} F</strong>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100">
+        <i class="fas fa-save me-2"></i>Mettre à jour
+    </button>
+</form>
 
                         <hr>
 
@@ -192,6 +206,24 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
+        
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function togglePaymentField(status) {
+        const field = document.getElementById('paymentField');
+        if (status === 'payee') {
+            field.classList.remove('d-none');
+        } else {
+            field.classList.add('d-none');
+        }
+    }
+
+    window.addEventListener('load', function() {
+        const select = document.getElementById('statusSelect');
+        if (select) togglePaymentField(select.value);
+    });
+</script>
 </body>
 </html>

@@ -8,8 +8,7 @@ use App\Http\Controllers\Client\OrderController as ClientOrderController;
 use Illuminate\Support\Facades\Route;
 
 // ─── Page d'accueil ───────────────────────────────────────
-Route::get('/', fn() => redirect()->route('login'));
-
+Route::get('/', [App\Http\Controllers\Client\CatalogueController::class, 'index'])->name('home');
 // ─── Auth ─────────────────────────────────────────────────
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -37,6 +36,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:gestionnaire']
     Route::patch('/orders/{order}/status', [AdminOrderController::class, 'updateStatus'])->name('orders.update-status');
     Route::patch('/orders/{order}/cancel', [AdminOrderController::class, 'cancel'])->name('orders.cancel');
 });
+
+// ─── Routes publiques ─────────────────────────────────────
+Route::get('/catalogue', [App\Http\Controllers\Client\CatalogueController::class, 'index'])->name('client.catalogue');
+Route::get('/catalogue/{product:slug}', [App\Http\Controllers\Client\CatalogueController::class, 'show'])->name('client.product.show');
 
 // ─── Client ───────────────────────────────────────────────
 Route::prefix('client')->name('client.')->middleware(['auth', 'role:client'])->group(function () {
